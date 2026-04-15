@@ -31,19 +31,23 @@ Both models achieve **96 % test accuracy / 95.83 % F1** on 150 held-out biomedic
 
 ```
 model_distillation/
-├── Dataset/                  # Raw .txt abstracts
-│   ├── cancer/
-│   └── non_cancer/
-├── data_splits/              # Auto-generated CSV splits + soft-label cache
-├── models/
-│   ├── lora_model/           # Saved LoRA-adapted DistilBERT
-│   └── distillation_model/   # Saved distillation student DistilBERT
-├── results/                  # JSON metrics + PNG plots
-├── data_loader.py            # Data loading, cleaning, splitting
-├── lora_training.py          # LoRA fine-tuning with HuggingFace Trainer
-├── distillation_training.py  # GPT-4o soft labels + custom training loop
-├── run_all.py                # End-to-end orchestration script
-├── results.ipynb             # Analysis notebook (plots + observations)
+├── Dataset/                        # Raw .txt abstracts (not tracked in git)
+│   ├── Cancer/
+│   └── Non-Cancer/
+├── src/                            # All Python source modules
+│   ├── data_loader.py              # Data loading, cleaning, 70/15/15 split
+│   ├── lora_training.py            # LoRA fine-tuning (HuggingFace Trainer)
+│   ├── distillation_training.py    # GPT-4o soft labels + custom training loop
+│   └── run_all.py                  # End-to-end orchestration script
+├── notebooks/
+│   └── results.ipynb               # Analysis notebook (plots + observations)
+├── models/                         # Saved model weights (not tracked in git)
+│   ├── lora_model/
+│   └── distillation_model/
+├── results/                        # JSON metrics + PNG plots
+├── data_splits/                    # CSV splits + soft-label cache (auto-generated)
+├── .env                            # Azure OpenAI credentials (never commit!)
+├── .gitignore
 ├── requirements.txt
 └── README.md
 ```
@@ -83,18 +87,18 @@ DEPLOYMENT_NAME=gpt-4o
 
 ```bash
 # Run all steps end-to-end (idempotent — skips completed steps)
-python run_all.py
+python src/run_all.py
 
 # Or run individual steps
-python data_loader.py          # step 1: split data
-python lora_training.py        # step 2: LoRA fine-tuning
-python distillation_training.py  # step 3: knowledge distillation
+python src/data_loader.py              # step 1: split data
+python src/lora_training.py            # step 2: LoRA fine-tuning
+python src/distillation_training.py    # step 3: knowledge distillation
 ```
 
-After training, open `results.ipynb` to view plots and analysis:
+After training, open the analysis notebook from the project root:
 
 ```bash
-jupyter notebook results.ipynb
+jupyter notebook notebooks/results.ipynb
 ```
 
 ---
