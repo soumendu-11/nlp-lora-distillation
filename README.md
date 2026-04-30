@@ -194,6 +194,42 @@ This is a mathematical correction from Hinton's paper. Dividing logits by T shri
 
 ---
 
+### Libraries & Implementation Notes
+
+There is **no dedicated distillation library** in this project — the distillation logic is custom-implemented from scratch using PyTorch primitives.
+
+**Core libraries used in `src/distillation_training.py`:**
+
+| Library | Purpose |
+|---|---|
+| **PyTorch** (`torch`) | Training loop, tensors, optimizer, KL-divergence and cross-entropy losses |
+| **HuggingFace Transformers** | Loading `distilbert-base-uncased` student model + tokenizer |
+| **Azure OpenAI SDK** (`openai.AzureOpenAI`) | Calling GPT-4o teacher to generate soft labels |
+| **scikit-learn** | Computing accuracy, F1, precision, recall metrics |
+| **python-dotenv** | Loading Azure API credentials from `.env` |
+| **tqdm** | Progress bars |
+
+The distillation loss is hand-written in `src/distillation_training.py` (lines 156–173) using just two PyTorch functions:
+
+```python
+torch.nn.functional.kl_div(...)         # KL divergence term
+torch.nn.functional.cross_entropy(...)  # hard-label term
+```
+
+**Why no specialized distillation library?**
+
+For binary classification with logit-based KL distillation, raw PyTorch is sufficient and more transparent than wrapping higher-level frameworks like:
+
+- `textbrewer` (general-purpose distillation toolkit)
+- `huggingface/distil*` reference implementations
+- `torchdistill`
+
+Those would only be needed for multi-stage distillation, intermediate-layer matching (attention/hidden-state transfer), or a config-driven pipeline. A direct PyTorch implementation keeps the loss math fully visible and easy to tune.
+
+> **Note:** LoRA (the other approach in this project) *does* use a dedicated library — **PEFT (`peft>=0.12.0`)** from HuggingFace — for the low-rank adapter injection. Distillation here is plain PyTorch.
+
+---
+
 ## Possible Next Steps
 
 1. **Generate truly soft GPT-4o labels** — prompt for explicit uncertainty reasoning to get non-binary distributions
