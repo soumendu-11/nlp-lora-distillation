@@ -140,6 +140,58 @@ The models differ on exactly **2 out of 150 test predictions** — in a perfectl
 - **Loss**: `L = α·T²·KL(student/T ‖ teacher) + (1−α)·CE(student, hard_label)`
 - **Soft label cache**: `data_splits/soft_labels_cache.json` (avoids repeated API calls)
 
+### Hyperparameter Explanations
+
+#### Why Temperature (T) = 4?
+
+Temperature controls how much the student's probability distribution is **softened** before computing the KL-divergence loss. The formula is `softmax(logits / T)` — dividing by T shrinks the logits before softmax, which compresses the gap between class probabilities and produces a more spread-out distribution.
+
+**Effect of T on a sample logit `[3.0, 0.5]`:**
+
+| Temperature | Softmax output | Effect |
+|---|---|---|
+| T = 1 | [0.92, 0.08] | Sharp — nearly certain |
+| T = 2 | [0.81, 0.19] | Softer |
+| **T = 4** | **[0.68, 0.32]** | **Balanced spread (chosen)** |
+| T = 10 | [0.56, 0.44] | Nearly uniform |
+
+**Why T = 4 specifically?** It is the standard sweet spot from Hinton et al.'s original 2015 distillation paper:
+
+- **Too low (T = 1–2)** — the student barely learns from soft labels; the distribution stays sharp and near-binary, effectively reducing the loss to plain cross-entropy on hard labels.
+- **Too high (T = 8–10+)** — differences between classes get washed out completely; probabilities look nearly uniform and the training signal degrades.
+- **T = 4** — softens the output just enough to amplify the "dark knowledge" (the small but meaningful probabilities the teacher assigns to wrong classes) without losing the overall signal.
+
+> **Note on this project:** Because GPT-4o emitted near-binary labels (P > 0.9 for one class in ~80% of samples), the temperature scaling had limited practical effect — no amount of softening on the student side can recover nuance the teacher never expressed.
+
+---
+
+#### What is Alpha (α) and Why α = 0.7?
+
+Alpha controls the **balance between two loss terms**: learning from the teacher (soft labels) vs. learning from ground truth (hard labels).
+
+**The combined loss with α = 0.7:**
+
+```
+L = 0.7 · T² · KL(student/T ‖ teacher) + 0.3 · CE(student, hard_label)
+        └────────── soft-label loss ──────────┘   └── hard-label loss ──┘
+```
+
+**What each term does:**
+
+| Term | Learns from | Signal |
+|---|---|---|
+| **KL divergence** (weighted by α) | Teacher's soft probabilities (GPT-4o) | "Mimic the teacher's uncertainty" |
+| **Cross-Entropy** (weighted by 1 − α) | Hard ground-truth labels (0 or 1) | "Predict the correct class" |
+
+**Intuition for choosing α:**
+
+- α → **1.0** — trust the teacher entirely, almost ignore ground truth
+- α → **0.0** — ignore the teacher, fall back to standard fine-tuning
+- **α = 0.7** — lean toward the teacher (70%) but keep ground truth as a safety anchor (30%) in case the teacher is wrong
+
+**Why is the KL term multiplied by T²?**
+This is a mathematical correction from Hinton's paper. Dividing logits by T shrinks the KL gradients by a factor of 1/T². Multiplying the loss by T² restores the gradients to the same scale as the CE loss, so neither term dominates simply because of temperature scaling.
+
 ---
 
 ## Possible Next Steps
